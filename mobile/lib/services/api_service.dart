@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:mobile/services/auth_service.dart';
 import '../models/estacion.dart';
 
 class ApiService {
@@ -16,5 +17,18 @@ class ApiService {
     } else {
       throw Exception('Falla al conectar con el servidor SMAT');
     }
+  }
+  
+  Future<bool> crearEstacion(String nombre, String ubicacion) async {
+    final token = await AuthService().getToken();
+    final response = await http.post(
+      Uri.parse('$baseUrl/estaciones/'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'nombre': nombre, 'ubicacion': ubicacion}),
+    );
+    return response.statusCode == 200;
   }
 }
