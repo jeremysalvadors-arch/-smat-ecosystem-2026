@@ -9,15 +9,22 @@ class ApiService {
   final String baseUrl = "http://127.0.0.1:8000";
 
   Future<List<Estacion>> fetchEstaciones() async {
-    final response = await http.get(Uri.parse('$baseUrl/estaciones/'));
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/estaciones/'))
+        .timeout(const Duration(seconds: 5)); // Evita esperas infinitas
 
-    if (response.statusCode == 200) {
-      List jsonResponse = json.decode(response.body);
-      return jsonResponse.map((data) => Estacion.fromJson(data)).toList();
-    } else {
-      throw Exception('Falla al conectar con el servidor SMAT');
+      if (response.statusCode == 200) {
+        List jsonResponse = json.decode(response.body);
+        return jsonResponse.map((data) => Estacion.fromJson(data)).toList();
+      } else {
+        throw Exception('Error del servidor: ${response.statusCode}');
+      }
+    } catch (e) {
+      // Esto evita que la App se cierre inesperadamente
+      throw Exception('No se pudo conectar con SMAT. ¿Está el servidor activo?');
     }
   }
+
   
   Future<bool> crearEstacion(String nombre, String ubicacion) async {
     final token = await AuthService().getToken();
