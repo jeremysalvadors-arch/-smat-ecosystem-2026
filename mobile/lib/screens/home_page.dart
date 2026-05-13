@@ -13,8 +13,16 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final ApiService apiService = ApiService();
+  // Definimos la variable para el Future como pide el reto de Refresh
+  late Future<List<Estacion>> futureEstaciones;
 
-  // --- PASO 3: DIÁLOGO DE EDICIÓN ---
+  @override
+  void initState() {
+    super.initState();
+    // Inicializamos el future al cargar la página
+    futureEstaciones = apiService.getEstaciones();
+  }
+
   void _mostrarDialogoEdicion(Estacion estacion) {
     final nombreCtrl = TextEditingController(text: estacion.nombre);
     final ubicacionCtrl = TextEditingController(text: estacion.ubicacion);
@@ -26,33 +34,21 @@ class _HomePageState extends State<HomePage> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(
-              controller: nombreCtrl,
-              decoration: const InputDecoration(labelText: "Nombre"),
-            ),
-            TextField(
-              controller: ubicacionCtrl,
-              decoration: const InputDecoration(labelText: "Ubicación"),
-            ),
+            TextField(controller: nombreCtrl, decoration: const InputDecoration(labelText: "Nombre")),
+            TextField(controller: ubicacionCtrl, decoration: const InputDecoration(labelText: "Ubicación")),
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancelar"),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancelar")),
           ElevatedButton(
             onPressed: () async {
-              bool ok = await apiService.editarEstacion(
-                estacion.id,
-                nombreCtrl.text,
-                ubicacionCtrl.text,
-              );
+              bool ok = await apiService.editarEstacion(estacion.id, nombreCtrl.text, ubicacionCtrl.text);
               if (ok) {
-                if (mounted) {
-                  Navigator.pop(context);
-                  setState(() {}); // Refrescar lista
-                }
+                Navigator.pop(context);
+                setState(() {
+                  // Volvemos a disparar el Future para traer datos frescos
+                  futureEstaciones = apiService.getEstaciones();
+                });
               }
             },
             child: const Text("Guardar"),
@@ -72,45 +68,44 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(Icons.logout),
             onPressed: () async {
               await AuthService().logout();
-              if (mounted) {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                  (route) => false,
-                );
-              }
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+                (route) => false,
+              );
             },
           )
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          setState(() {}); // Recarga el FutureBuilder
-        },
-        child: FutureBuilder<List<Estacion>>(
-          future: apiService.getEstaciones(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            } else if (snapshot.hasError) {
-              return Center(child: Text('Error: ${snapshot.error}'));
-            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return const Center(child: Text('No hay estaciones.'));
-            }
+      body: FutureBuilder<List<Estacion>>(
+        future: futureEstaciones,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasError) {
+            // Aquí se mostrará el error del Try-Catch que agregaste al ApiService
+            return Center(child: Text('${snapshot.error}'));
+          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return const Center(child: Text("No hay datos"));
+          }
 
-            final estaciones = snapshot.data!;
-
-            return ListView.builder(
-              itemCount: estaciones.length,
-              physics: const AlwaysScrollableScrollPhysics(),
+          return RefreshIndicator(
+            onRefresh: () async {
+              setState(() {
+                // Volvemos a disparar el Future para traer datos frescos
+                futureEstaciones = apiService.getEstaciones();
+              });
+            },
+            child: ListView.builder(
+              itemCount: snapshot.data!.length,
+              // physics asegura que siempre se pueda arrastrar aunque haya pocos items
+              physics: const AlwaysScrollableScrollPhysics(), 
               itemBuilder: (context, index) {
-                final estacion = estaciones[index];
+                final estacion = snapshot.data![index];
+                
+                // Lógica de colores (Reto Fase Mobile)
+                final Color colorAlerta = (estacion.lectura > 50) ? Colors.red : Colors.green;
 
-                final Color colorAlerta = (estacion.valor > 50) 
-                    ? Colors.red 
-                    : Colors.green;
-
-                // GESTIÓN DE INTERFAZ: Swipe-to-Dismiss
                 return Dismissible(
                   key: Key(estacion.id.toString()),
                   direction: DismissDirection.endToStart,
@@ -121,27 +116,19 @@ class _HomePageState extends State<HomePage> {
                     child: const Icon(Icons.delete, color: Colors.white),
                   ),
                   onDismissed: (direction) async {
-                    bool ok = await apiService.eliminarEstacion(estacion.id);
-                    if (ok) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("${estacion.nombre} eliminada")),
-                      );
-                    }
+                    await apiService.eliminarEstacion(estacion.id);
                   },
                   child: ListTile(
-                    leading: Icon(
-                      Icons.sensors, 
-                      color: colorAlerta,
-                    ),
+                    leading: Icon(Icons.sensors, color: colorAlerta),
                     title: Text(estacion.nombre),
-                    subtitle: Text("${estacion.ubicacion} • Valor: ${estacion.lectura}"),
+                    subtitle: Text(estacion.ubicacion),
                     onTap: () => _mostrarDialogoEdicion(estacion),
                   ),
                 );
               },
-            );
-          },
-        ),
+            ),
+          );
+        },
       ),
     );
   }
