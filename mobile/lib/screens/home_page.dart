@@ -1,12 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
-<<<<<<< HEAD
 import '../services/api_service.dart';
 import '../models/estacion.dart';
 import 'login_screen.dart';
-=======
-import 'login_screen.dart'; // Para que reconozca el LoginScreen al cerrar sesión
->>>>>>> 05846b20bbf23e3108ac5391bcbaf6405f02c8b3
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -14,7 +10,6 @@ class HomePage extends StatefulWidget {
   @override
   State<HomePage> createState() => _HomePageState();
 }
-<<<<<<< HEAD
 
 class _HomePageState extends State<HomePage> {
   final ApiService apiService = ApiService();
@@ -67,9 +62,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-=======
-class _HomePageState extends State<HomePage> {
->>>>>>> 05846b20bbf23e3108ac5391bcbaf6405f02c8b3
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -80,7 +72,6 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(Icons.logout),
             onPressed: () async {
               await AuthService().logout();
-<<<<<<< HEAD
               if (mounted) {
                 Navigator.pushAndRemoveUntil(
                   context,
@@ -88,19 +79,10 @@ class _HomePageState extends State<HomePage> {
                   (route) => false,
                 );
               }
-=======
-              // Reinicia la navegación al Login y borra el historial
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
-                (route) => false,
-              );
->>>>>>> 05846b20bbf23e3108ac5391bcbaf6405f02c8b3
             },
           )
         ],
       ),
-<<<<<<< HEAD
       body: RefreshIndicator(
         onRefresh: () async {
           setState(() {}); // Recarga el FutureBuilder
@@ -161,9 +143,6 @@ class _HomePageState extends State<HomePage> {
           },
         ),
       ),
-=======
-      // ... resto del body con el ListView
->>>>>>> 05846b20bbf23e3108ac5391bcbaf6405f02c8b3
     );
   }
 }

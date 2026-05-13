@@ -38,7 +38,6 @@ class ApiService {
     );
     return response.statusCode == 200;
   }
-<<<<<<< HEAD
 
   Future<bool> eliminarEstacion(int id) async {
     final token = await AuthService().getToken();
@@ -61,6 +60,4 @@ class ApiService {
     );
     return response.statusCode == 200;
   }
-=======
->>>>>>> 05846b20bbf23e3108ac5391bcbaf6405f02c8b3
 }
