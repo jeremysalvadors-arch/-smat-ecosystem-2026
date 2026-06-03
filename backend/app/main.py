@@ -1,43 +1,143 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from . import models, schemas, auth, database
+from app import models, schemas, auth, crud
+from app.database import engine, get_db
 
-models.Base.metadata.create_all(bind=database.engine)
-app = FastAPI(title="SMAT API - Unidad I")
+models.Base.metadata.create_all(bind=engine)
 
-# CONFIGURACIÓN CRÍTICA PARA SEMANA 5 (CONEXIÓN MÓVIL)
+app = FastAPI(
+    title="SMAT - Sistema de Monitoreo de Alerta Temprana",
+    description="""
+API para gestión y monitoreo de desastres naturales.
+Permite la telemetría de sensores en tiempo real y el cálculo de niveles de riesgo.
+
+**Entidades principales:**
+* **Estaciones:** Puntos de monitoreo físico.
+* **Lecturas:** Datos capturados por sensores.
+* **Riesgos:** Análisis de criticidad basado en umbrales.
+    """,
+    version="1.0.0",
+    contact={
+        "name": "Soporte Técnico SMAT - FISI",
+        "url": "http://fisi.unmsm.edu.pe",
+        "email": "desarrollo.smat@unmsm.edu.pe",
+    },
+    license_info={"name": "Apache 2.0"},
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.post("/token", tags=["Seguridad"])
+# --- SEGURIDAD ---
+
+@app.post("/token", tags=["Seguridad"], summary="Obtener token de acceso")
 def login():
-    return {"access_token": auth.crear_token({"sub": "admin_fisi"}), "token_type": "bearer"}
+    return {
+        "access_token": auth.crear_token_acceso({"sub": "admin_fisi"}),
+        "token_type": "bearer"
+    }
 
-@app.get("/estaciones/", response_model=list[schemas.Estacion], tags=["SMAT"])
-def listar_estaciones(db: Session = Depends(database.get_db)):
-    return db.query(models.EstacionDB).all()
+# --- ESTACIONES ---
 
-@app.post("/estaciones/", tags=["SMAT"])
-def crear_estacion(estacion: schemas.EstacionCreate, db: Session = Depends(database.get_db), user=Depends(auth.validar_token)):
-    nueva = models.EstacionDB(**estacion.dict())
-    db.add(nueva)
-    db.commit()
-    return nueva
+@app.get(
+    "/estaciones/",
+    response_model=list[schemas.Estacion],
+    tags=["Gestión de Infraestructura"],
+    summary="Listar todas las estaciones",
+    description="Devuelve la lista completa de estaciones registradas en la base de datos."
+)
+def listar_estaciones(db: Session = Depends(get_db)):
+    return crud.listar_estaciones(db)
 
-@app.post("/lecturas/", tags=["Telemetría"])
-def registrar_lectura(lectura: schemas.LecturaCreate, db: Session = Depends(database.get_db), user=Depends(auth.validar_token)):
-    # Reto Maestro: Validación de existencia
-    estacion = db.query(models.EstacionDB).filter(models.EstacionDB.id == lectura.estacion_id).first()
+@app.post(
+    "/estaciones/",
+    response_model=schemas.Estacion,
+    status_code=201,
+    tags=["Gestión de Infraestructura"],
+    summary="Registrar una nueva estación",
+    description="Inserta una estación física (río, volcán, zona sísmica) en la base de datos.",
+    responses={404: {"description": "No encontrada"}}
+)
+def crear_estacion(
+    estacion: schemas.EstacionCreate,
+    db: Session = Depends(get_db),
+    user: str = Depends(auth.validar_token)
+):
+    return crud.crear_estacion(db, estacion)
+
+# --- LECTURAS ---
+
+@app.post(
+    "/lecturas/",
+    status_code=201,
+    tags=["Telemetría de Sensores"],
+    summary="Recibir datos de telemetría",
+    description="Recibe el valor de un sensor y lo vincula a una estación existente.",
+    responses={404: {"description": "Estación no encontrada"}}
+)
+def registrar_lectura(
+    lectura: schemas.LecturaCreate,
+    db: Session = Depends(get_db),
+    user: str = Depends(auth.validar_token)
+):
+    estacion = crud.obtener_estacion(db, lectura.estacion_id)
     if not estacion:
         raise HTTPException(status_code=404, detail="Estación no encontrada")
-    
-    nueva_lectura = models.LecturaDB(**lectura.dict())
-    db.add(nueva_lectura)
-    db.commit()
+    crud.registrar_lectura(db, lectura)
     return {"status": "Lectura registrada con éxito"}
+
+# --- ANÁLISIS ---
+
+@app.get(
+    "/estaciones/{id}/riesgo",
+    tags=["Análisis de Riesgo"],
+    summary="Evaluar nivel de peligro actual",
+    description="Analiza la última lectura de una estación y determina si el estado es NORMAL, ALERTA o PELIGRO.",
+    responses={404: {"description": "Estación no encontrada"}}
+)
+def obtener_riesgo(id: int, db: Session = Depends(get_db)):
+    estacion = crud.obtener_estacion(db, id)
+    if not estacion:
+        raise HTTPException(status_code=404, detail="Estación no encontrada")
+    lecturas = db.query(models.LecturaDB).filter(models.LecturaDB.estacion_id == id).all()
+    if not lecturas:
+        return {"id": id, "nivel": "SIN DATOS", "valor": 0}
+    ultima = lecturas[-1].valor
+    if ultima > 20.0:
+        nivel = "PELIGRO"
+    elif ultima > 10.0:
+        nivel = "ALERTA"
+    else:
+        nivel = "NORMAL"
+    return {"id": id, "valor": ultima, "nivel": nivel}
+
+@app.get(
+    "/estaciones/{id}/historial",
+    tags=["Reportes Históricos"],
+    summary="Ver historial y promedio de lecturas",
+    description="Devuelve todas las lecturas de una estación con su conteo y promedio aritmético.",
+    responses={404: {"description": "Estación no encontrada"}}
+)
+def obtener_historial(id: int, db: Session = Depends(get_db)):
+    estacion = crud.obtener_estacion(db, id)
+    if not estacion:
+        raise HTTPException(status_code=404, detail="Estación no encontrada")
+    return crud.obtener_historial(db, id)
+
+@app.get(
+    "/estaciones/stats",
+    tags=["Auditoría"],
+    summary="Resumen ejecutivo del sistema",
+    description="Devuelve el total de estaciones, lecturas procesadas y la estación con el valor más alto."
+)
+def obtener_stats(db: Session = Depends(get_db)):
+    return crud.obtener_stats(db)
