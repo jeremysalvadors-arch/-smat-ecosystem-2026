@@ -6,9 +6,10 @@ import random
 # CONFIGURACIÓN
 BROKER = "broker.hivemq.com"
 PORT = 1883
-TOPIC = "fisi/smat/estaciones/1"  # Cambia el 1 por tu estacion_id
+ESTACION_ID = 1
+TOPIC = f"fisi/smat/estaciones/{ESTACION_ID}/lecturas"  # nuevo formato Lab 11
 
-client = mqtt.Client()
+client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)  # evita el DeprecationWarning
 client.connect(BROKER, PORT)
 
 print(f"--- Sensor MQTT iniciado. Publicando en '{TOPIC}' ---")
@@ -19,7 +20,6 @@ while True:
         "valor": valor,
         "timestamp": time.time()
     }
-
     client.publish(TOPIC, json.dumps(payload))
-    print(f"[MQTT] Enviado: {payload}")
+    print(f"[MQTT] Enviado: valor={valor} cm")
     time.sleep(10)
