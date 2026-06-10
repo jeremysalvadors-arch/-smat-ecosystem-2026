@@ -16,7 +16,7 @@ def obtener_token():
             print("[AUTH] Token obtenido correctamente.")
             return token
         else:
-            print(f"[AUTH ERROR] No se pudo obtener el token: {response.status_code}")
+            print(f"[AUTH ERROR] Código: {response.status_code}")
             return None
     except Exception as e:
         print(f"[AUTH CRÍTICO] No hay conexión con el servidor: {e}")
@@ -29,21 +29,15 @@ def leer_sensor_emulado():
 def enviar_telemetria():
     print(f"--- Iniciando Emisor IoT para Estación {ESTACION_ID} ---")
 
-    # Obtener token automáticamente al iniciar
     token = obtener_token()
     if not token:
-        print("[CRÍTICO] No se puede iniciar sin token. Verifica que el backend esté corriendo.")
+        print("[CRÍTICO] No se puede iniciar sin token. ¿Está el backend corriendo?")
         return
 
     while True:
         valor = leer_sensor_emulado()
-        payload = {
-            "valor": valor,
-            "estacion_id": ESTACION_ID
-        }
-        headers = {
-            "Authorization": f"Bearer {token}"
-        }
+        payload = {"valor": valor, "estacion_id": ESTACION_ID}
+        headers = {"Authorization": f"Bearer {token}"}
 
         # Lógica de alarma y frecuencia dinámica (Reto semana 9)
         if valor > 70.0:
@@ -57,7 +51,6 @@ def enviar_telemetria():
             if response.status_code in [200, 201]:
                 print(f"[OK] Lectura enviada: {valor} cm — próximo envío en {intervalo_envio}s")
             elif response.status_code == 401:
-                # Token expirado — obtener uno nuevo
                 print("[AUTH] Token expirado. Renovando...")
                 token = obtener_token()
                 if not token:
