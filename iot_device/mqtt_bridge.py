@@ -3,18 +3,19 @@ import requests
 import json
 import sys
 import time
+import os
 
 # CONFIGURACIÓN
 MQTT_BROKER = "broker.hivemq.com"
 MQTT_PORT = 1883
-MQTT_TOPIC = "fisi/smat/estaciones/+/lecturas"  # '+' es wildcard para el ID
-API_URL = "http://127.0.0.1:8000/lecturas/"
-TOKEN_URL = "http://127.0.0.1:8000/token"
+MQTT_TOPIC = "fisi/smat/estaciones/+/lecturas"
+API_URL = os.environ.get("API_URL", "http://backend:8000/lecturas/")
+TOKEN_URL = os.environ.get("TOKEN_URL", "http://backend:8000/token")
 
-# ============================================================
-# FILTRO DE RUIDO (Deadband Filter) - Reto Semana 11
-# Caché: { estacion_id: {"valor": float, "timestamp": float} }
-# ============================================================
+# NUEVO: credenciales para autenticarse contra /token
+ADMIN_USER = os.environ.get("DEFAULT_ADMIN_USER", "admin_fisi")
+ADMIN_PASSWORD = os.environ.get("DEFAULT_ADMIN_PASSWORD", "smat2026")
+
 cache_lecturas = {}
 UMBRAL_CAMBIO = 0.05   # 5% de variación mínima para insertar
 INTERVALO_FORZADO = 60  # segundos máximos sin insertar (reporte mínimo de vida)
@@ -53,13 +54,20 @@ def debe_insertar(estacion_id: int, nuevo_valor: float) -> tuple[bool, str]:
 def obtener_token():
     """Obtiene el JWT del backend automáticamente."""
     try:
-        response = requests.post(TOKEN_URL)
+        response = requests.post(
+            TOKEN_URL,
+            data={
+                "username": ADMIN_USER,
+                "password": ADMIN_PASSWORD
+            }
+        )
         if response.status_code == 200:
             token = response.json()["access_token"]
             print("[AUTH] Token obtenido correctamente.")
             return token
         else:
             print(f"[AUTH ERROR] Código: {response.status_code}")
+            print(f"[AUTH ERROR] Detalle: {response.text}")
             return None
     except Exception as e:
         print(f"[AUTH CRITICO] No hay conexión con el backend: {e}")

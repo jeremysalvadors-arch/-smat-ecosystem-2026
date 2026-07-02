@@ -41,7 +41,7 @@ venv\Scripts\activate        # Windows
 source venv/bin/activate     # Linux/Mac
 
 # 3. Instalar dependencias
-pip install -r requirements.txt
+pip install -r requeriments.txt
 
 # 4. Correr el servidor
 cd app
