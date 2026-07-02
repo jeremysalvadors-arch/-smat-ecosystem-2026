@@ -85,7 +85,8 @@ python sensor_emitter.py
 
 1. Levantar el backend
 2. Abrir la app mobile en Chrome
-3. Iniciar sesión (cualquier usuario/contraseña)
+3. Iniciar sesión con el usuario admin de prueba: `admin_fisi` / `smat2026`
+   (se crea automáticamente en la base de datos la primera vez que arranca el backend)
 4. Crear una estación desde la app
 5. Correr el emisor IoT — las lecturas aparecerán en la base de datos
 6. Refrescar la lista en la app para ver los cambios

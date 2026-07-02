@@ -3,6 +3,7 @@ import '../services/auth_service.dart';
 import '../services/api_service.dart';
 import '../models/estacion.dart';
 import 'login_screen.dart';
+import 'add_estacion.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -129,6 +130,24 @@ class _HomePageState extends State<HomePage> {
             ),
           );
         },
+      ),
+      floatingActionButton: FloatingActionButton(
+        tooltip: 'Nueva estación',
+        onPressed: () async {
+          // Esperamos el resultado de AddEstacionScreen: hace Navigator.pop(context, true)
+          // cuando la estación se creó con éxito (ver add_estacion.dart)
+          final creado = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => AddEstacionScreen()),
+          );
+          if (creado == true) {
+            setState(() {
+              // Volvemos a disparar el Future para traer datos frescos
+              futureEstaciones = apiService.getEstaciones();
+            });
+          }
+        },
+        child: const Icon(Icons.add),
       ),
     );
   }

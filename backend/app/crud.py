@@ -15,6 +15,24 @@ def listar_estaciones(db: Session):
 def obtener_estacion(db: Session, id: int):
     return db.query(models.EstacionDB).filter(models.EstacionDB.id == id).first()
 
+def editar_estacion(db: Session, id: int, estacion: schemas.EstacionCreate):
+    existente = obtener_estacion(db, id)
+    if not existente:
+        return None
+    existente.nombre = estacion.nombre
+    existente.ubicacion = estacion.ubicacion
+    db.commit()
+    db.refresh(existente)
+    return existente
+
+def eliminar_estacion(db: Session, id: int):
+    existente = obtener_estacion(db, id)
+    if not existente:
+        return None
+    db.delete(existente)
+    db.commit()
+    return existente
+
 def registrar_lectura(db: Session, lectura: schemas.LecturaCreate):
     nueva = models.LecturaDB(**lectura.dict())
     db.add(nueva)

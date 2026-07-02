@@ -1,10 +1,25 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app import models, schemas, auth, crud
-from app.database import engine, get_db
+from app.database import engine, get_db, SessionLocal
 
 models.Base.metadata.create_all(bind=engine)
+
+# Usuario admin por defecto para desarrollo/pruebas del curso.
+# En un entorno real esto se gestionaría con un endpoint de registro.
+DEFAULT_ADMIN_USER = "admin_fisi"
+DEFAULT_ADMIN_PASSWORD = "smat2026"
+
+def _sembrar_usuario_admin():
+    db = SessionLocal()
+    try:
+        auth.crear_usuario_si_no_existe(db, DEFAULT_ADMIN_USER, DEFAULT_ADMIN_PASSWORD)
+    finally:
+        db.close()
+
+_sembrar_usuario_admin()
 
 app = FastAPI(
     title="SMAT - Sistema de Monitoreo de Alerta Temprana",
@@ -39,10 +54,19 @@ app.add_middleware(
 
 # --- SEGURIDAD ---
 
-@app.post("/token", tags=["Seguridad"], summary="Obtener token de acceso")
-def login():
+@app.post(
+    "/token",
+    tags=["Seguridad"],
+    summary="Obtener token de acceso",
+    description="Valida usuario y contraseña contra la base de datos y devuelve un JWT. "
+                 f"Usuario de prueba: '{DEFAULT_ADMIN_USER}' / contraseña: '{DEFAULT_ADMIN_PASSWORD}'.",
+)
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    usuario = auth.autenticar_usuario(db, form_data.username, form_data.password)
+    if not usuario:
+        raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
     return {
-        "access_token": auth.crear_token_acceso({"sub": "admin_fisi"}),
+        "access_token": auth.crear_token_acceso({"sub": usuario.username}),
         "token_type": "bearer"
     }
 
@@ -73,6 +97,42 @@ def crear_estacion(
     user: str = Depends(auth.validar_token)
 ):
     return crud.crear_estacion(db, estacion)
+
+@app.put(
+    "/estaciones/{id}",
+    response_model=schemas.Estacion,
+    tags=["Gestión de Infraestructura"],
+    summary="Editar una estación existente",
+    description="Actualiza el nombre y la ubicación de una estación registrada.",
+    responses={404: {"description": "Estación no encontrada"}}
+)
+def editar_estacion(
+    id: int,
+    estacion: schemas.EstacionCreate,
+    db: Session = Depends(get_db),
+    user: str = Depends(auth.validar_token)
+):
+    actualizada = crud.editar_estacion(db, id, estacion)
+    if not actualizada:
+        raise HTTPException(status_code=404, detail="Estación no encontrada")
+    return actualizada
+
+@app.delete(
+    "/estaciones/{id}",
+    tags=["Gestión de Infraestructura"],
+    summary="Eliminar una estación",
+    description="Elimina una estación y su historial de lecturas asociado.",
+    responses={404: {"description": "Estación no encontrada"}}
+)
+def eliminar_estacion(
+    id: int,
+    db: Session = Depends(get_db),
+    user: str = Depends(auth.validar_token)
+):
+    eliminada = crud.eliminar_estacion(db, id)
+    if not eliminada:
+        raise HTTPException(status_code=404, detail="Estación no encontrada")
+    return {"status": "Estación eliminada con éxito"}
 
 # --- LECTURAS ---
 

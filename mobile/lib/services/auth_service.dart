@@ -6,7 +6,13 @@ class AuthService {
   final String baseUrl = "http://127.0.0.1:8000";
 
   Future<bool> login(String username, String password) async {
-    final response = await http.post(Uri.parse('$baseUrl/token'));
+    // El backend espera un formulario OAuth2 (x-www-form-urlencoded),
+    // no JSON, con los campos 'username' y 'password'.
+    final response = await http.post(
+      Uri.parse('$baseUrl/token'),
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: {'username': username, 'password': password},
+    );
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
